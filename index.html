@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Desafío Señas con IA</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Librerías de Inteligencia Artificial (Teachable Machine & TFJS) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <!-- Confeti para celebración -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- Estilos Separados -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header Superior -->
+    <header class="w-full px-4 sm:px-6 py-3 border-b border-slate-900 bg-slate-950/90 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
+                <i class="fa-solid fa-hands-asl-interpreting text-base"></i>
+            </div>
+            <div>
+                <span class="text-sm font-bold text-white tracking-tight block leading-tight font-display">Desafío Señas</span>
+                <span class="text-[10px] text-slate-400">Juego Interactivo con Teachable Machine</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- Puntos -->
+            <div class="text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <i class="fa-solid fa-star text-amber-400"></i>
+                <span id="score-count">0</span> pts
+            </div>
+
+            <!-- Estado de la IA / Cámara -->
+            <div id="status-pill" class="text-xs text-slate-300 font-medium px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 flex items-center gap-2">
+                <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                <span id="status-text" class="hidden sm:inline">Iniciando...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Área Principal de Juego -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center">
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+            
+            <!-- Columna 1: Tarjeta de la Pregunta y Palabra (7 Cols) -->
+            <div class="md:col-span-7 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+                
+                <div>
+                    <!-- Categoría y Contador de Pregunta -->
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full flex items-center">
+                            <i id="q-category-icon" class="fa-solid fa-sun mr-1.5"></i>
+                            <span id="q-category">Astronomía</span>
+                        </span>
+                        <span class="text-xs text-slate-400 font-medium">
+                            Pregunta <span id="q-current" class="text-white font-bold">1</span> / <span id="q-total">8</span>
+                        </span>
+                    </div>
+
+                    <!-- Texto de la Pregunta -->
+                    <h1 id="q-title" class="text-xl sm:text-2xl font-bold text-white font-display leading-snug mb-2">
+                        ¿Cuál es la estrella central de nuestro sistema solar?
+                    </h1>
+                    <p id="q-hint" class="text-xs text-slate-400 mb-6">
+                        Pista: Astro luminoso de 3 letras
+                    </p>
+
+                    <!-- Casillas de la Palabra a Deletrear -->
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 sm:p-5 text-center mb-4">
+                        <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-3">Muestra la seña de cada letra a la cámara:</span>
+                        
+                        <div id="slots-row" class="flex items-center justify-center gap-2.5 sm:gap-3 flex-wrap">
+                            <!-- Letras generadas dinámicamente -->
+                        </div>
+
+                        <!-- Indicador de Letra Objetivo -->
+                        <div id="target-box" class="mt-4 pt-3 border-t border-slate-900 flex items-center justify-center gap-2">
+                            <span class="text-xs text-slate-400">Siguiente seña:</span>
+                            <span id="target-letter-display" class="px-3.5 py-1 bg-indigo-600 text-white font-extrabold font-display rounded-xl text-base shadow-lg shadow-indigo-600/30 animate-bounce">
+                                S
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Banner de Felicitaciones al completar -->
+                    <div id="success-card" class="hidden bg-emerald-500/15 border border-emerald-500/30 rounded-2xl p-4 text-center animate-pop mb-4">
+                        <div class="text-emerald-400 font-bold text-lg font-display flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-circle-check"></i> ¡Palabra Correcta!
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">¡Excelente deletreo en lengua de señas!</p>
+                        <button onclick="game.nextQuestion()" class="mt-3 px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-95 transition">
+                            Siguiente Pregunta <i class="fa-solid fa-arrow-right ml-1"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botones de Navegación -->
+                <div class="flex items-center justify-between pt-4 border-t border-slate-800">
+                    <button onclick="game.prevQuestion()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl border border-slate-700 transition">
+                        <i class="fa-solid fa-chevron-left mr-1"></i> Anterior
+                    </button>
+                    
+                    <button onclick="game.skipLetter()" title="Avanzar si hay problemas de luz durante la exposición" class="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-forward-step"></i> Saltar Letra
+                    </button>
+
+                    <button onclick="game.nextQuestion()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-xl border border-slate-700 transition">
+                        Siguiente <i class="fa-solid fa-chevron-right ml-1"></i>
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Columna 2: Cámara y Detección (5 Cols) -->
+            <div class="md:col-span-5 bg-slate-900/70 border border-slate-800 rounded-3xl p-5 shadow-xl flex flex-col justify-between gap-4">
+                
+                <div>
+                    <!-- Header Cámara -->
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> Cámara en Vivo
+                        </span>
+                        <span class="text-[11px] text-slate-400 font-mono">IA Conectada</span>
+                    </div>
+
+                    <!-- Contenedor del Video / Canvas -->
+                    <div class="w-full aspect-[4/3] rounded-2xl bg-black border border-slate-800 overflow-hidden relative flex items-center justify-center shadow-inner">
+                        
+                        <!-- Canvas insertado por Teachable Machine -->
+                        <div id="webcam-view" class="w-full h-full flex items-center justify-center"></div>
+
+                        <!-- Pantalla de Carga / Error -->
+                        <div id="cam-loader" class="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center gap-2 p-4 text-center z-10">
+                            <div class="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p class="text-xs text-slate-300 font-medium">Iniciando cámara e IA...</p>
+                        </div>
+
+                        <!-- Barra de Hold / Mantener Seña -->
+                        <div id="hold-overlay" class="hidden absolute inset-0 bg-indigo-950/40 border-4 border-indigo-500 rounded-2xl flex flex-col items-center justify-center gap-2 pointer-events-none">
+                            <div class="w-28 bg-slate-950/90 rounded-full h-3 overflow-hidden p-0.5 border border-indigo-400/50">
+                                <div id="hold-bar" class="bg-gradient-to-r from-indigo-400 to-emerald-400 h-full rounded-full w-0 transition-all duration-75"></div>
+                            </div>
+                            <span class="text-[10px] font-bold text-white uppercase tracking-wider drop-shadow">Mantén la seña...</span>
+                        </div>
+                    </div>
+
+                    <!-- Tarjeta de Detección en Tiempo Real -->
+                    <div class="mt-3 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div id="live-letter" class="w-11 h-11 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-2xl font-black text-indigo-400 font-display">
+                                -
+                            </div>
+                            <div>
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block">Seña Detectada</span>
+                                <div class="w-24 bg-slate-800 rounded-full h-1.5 mt-1 overflow-hidden">
+                                    <div id="live-conf-bar" class="bg-indigo-500 h-full w-0 transition-all"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[10px] text-slate-500 block">Certeza</span>
+                            <span id="live-conf" class="text-sm font-bold text-emerald-400 font-mono">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Consejos para la Exposición -->
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 text-[11px] text-slate-400">
+                    <p class="font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-lightbulb text-amber-400"></i> Tip de exposición:
+                    </p>
+                    <p>Mantén la mano centrada frente a la cámara durante 1 segundo para confirmar la letra.</p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Footer Mínimo -->
+    <footer class="w-full px-4 py-3 border-t border-slate-900 bg-slate-950 text-center text-xs text-slate-500">
+        <span>Desafío de Señas con Inteligencia Artificial &bull; Proyecto con Teachable Machine</span>
+    </footer>
+
+    <!-- Archivos de la Aplicación -->
+    <script src="questions.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

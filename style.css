@@ -1,0 +1,65 @@
+/* Estilos personalizados para Desafío Señas con IA */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+    --bg-main: #090d16;
+    --card-bg: rgba(15, 23, 42, 0.75);
+    --border-color: rgba(51, 65, 85, 0.6);
+    --brand-primary: #6366f1;
+    --brand-accent: #10b981;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: var(--bg-main);
+    color: #f1f5f9;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Espejo para la cámara frontal */
+.camera-mirror {
+    transform: scaleX(-1);
+}
+
+/* Efecto glow */
+.glow-card {
+    box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.15);
+}
+
+/* Animaciones suaves */
+@keyframes popIn {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.animate-pop {
+    animation: popIn 0.25s ease-out forwards;
+}
+
+/* Scrollbar fina */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 9999px;
+}
