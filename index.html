@@ -4,18 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Práctica de Lengua de Señas</title>
+    <title>Desafío Señas IA</title>
 
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Iconos FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Librerías de reconocimiento de gestos -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script
-        src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Librerías locales (100% Offline) -->
+    <script src="libs/tailwind.js"></script>
+    <link rel="stylesheet" href="libs/fontawesome/all.min.css">
+    <script src="libs/tf.min.js"></script>
+    <script src="libs/teachablemachine-image.min.js"></script>
+    <script src="libs/confetti.browser.min.js"></script>
 
     <!-- Estilos de la aplicación -->
     <link rel="stylesheet" href="style.css">
@@ -31,12 +27,12 @@
                     <i class="fa-solid fa-hands-asl-interpreting"></i>
                 </div>
                 <div>
-                    <h1 class="text-base font-bold text-slate-900 leading-tight">Práctica de Señas</h1>
+                    <h1 class="text-base font-bold text-slate-900 leading-tight">Desafío Señas IA</h1>
                     <p class="text-xs text-slate-500">Aprende y practica deletreo dactilológico</p>
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 sm:gap-3">
+            <div class="flex items-center gap-1.5 sm:gap-3 flex-wrap justify-end">
                 <!-- Jugador actual -->
                 <button type="button" onclick="game.promptChangePlayer()"
                     class="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2.5 py-1.5 rounded-md flex items-center gap-1.5 transition cursor-pointer"
@@ -90,29 +86,29 @@
                         dificultad</span>
                     <p class="text-xs text-slate-600">5 preguntas por nivel (selecciona para practicar):</p>
                 </div>
-                <div class="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 gap-1 self-start sm:self-auto"
+                <div class="inline-flex flex-wrap rounded-lg border border-slate-200 p-1 bg-slate-50 gap-1 w-full sm:w-auto justify-center"
                     id="level-selector-group">
                     <button type="button" onclick="game.selectLevel('facil')" id="btn-lvl-facil"
-                        class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer bg-white text-blue-700 shadow-sm border border-slate-200">
+                        class="flex-1 sm:flex-none text-center px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer bg-white text-blue-700 shadow-sm border border-slate-200">
                         Fácil (3 letras)
                     </button>
                     <button type="button" onclick="game.selectLevel('normal')" id="btn-lvl-normal"
-                        class="px-3.5 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                        class="flex-1 sm:flex-none text-center px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition cursor-pointer">
                         Normal (4 letras)
                     </button>
                     <button type="button" onclick="game.selectLevel('dificil')" id="btn-lvl-dificil"
-                        class="px-3.5 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                        class="flex-1 sm:flex-none text-center px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900 transition cursor-pointer">
                         Difícil (5-6 letras)
                     </button>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
             <!-- Columna Izquierda: Pregunta y Casillas de Letras (7 Columnas) -->
             <div
-                class="md:col-span-7 bg-white border border-slate-200 rounded-xl p-5 sm:p-6 shadow-sm flex flex-col justify-between min-h-[460px]">
+                class="order-2 lg:order-1 lg:col-span-7 bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col justify-between min-h-[420px]">
 
                 <div>
                     <!-- Categoría y Contador -->
@@ -212,7 +208,7 @@
 
             <!-- Columna Derecha: Cámara y Detección (5 Columnas) -->
             <div
-                class="md:col-span-5 bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between gap-4">
+                class="order-1 lg:order-2 lg:col-span-5 bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm flex flex-col justify-between gap-4">
 
                 <div>
                     <!-- Header Cámara -->
@@ -354,7 +350,7 @@
 
     <!-- Pie de página simple -->
     <footer class="w-full px-4 py-3 border-t border-slate-200 bg-white text-center text-xs text-slate-500">
-        <span>Práctica de Lengua de Señas &bull; Aplicación interactiva</span>
+        <span>Desafío Señas IA &bull; Aplicación interactiva</span>
     </footer>
 
     <!-- Archivos de la Aplicación -->

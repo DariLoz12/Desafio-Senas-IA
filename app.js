@@ -4,7 +4,7 @@
 
 class SignGame {
     constructor() {
-        this.modelURL = "https://teachablemachine.withgoogle.com/models/gFe3GrbNX/";
+        this.modelURL = "./model/";
         this.model = null;
         this.webcam = null;
         this.isCameraActive = false;
@@ -144,8 +144,9 @@ class SignGame {
             statusText.textContent = 'Conectando cámara...';
 
             const flip = true;
+            // Configurar webcam adaptada a móviles (cámara frontal si existe)
             this.webcam = new tmImage.Webcam(400, 300, flip);
-            await this.webcam.setup();
+            await this.webcam.setup({ facingMode: "user" });
             await this.webcam.play();
 
             const container = document.getElementById('webcam-view');

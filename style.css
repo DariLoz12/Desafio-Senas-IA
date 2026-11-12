@@ -1,5 +1,5 @@
 /* Estilos sencillos, limpios y accesibles */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Font fallback to system fonts */
 
 :root {
     --bg-page: #f8fafc;
@@ -115,4 +115,13 @@ body {
 ::-webkit-scrollbar-thumb {
     background: #cbd5e1;
     border-radius: 4px;
+}
+/* Adaptabilidad táctil y móvil */
+@media (max-width: 640px) {
+    .letter-slot {
+        width: 2.75rem;
+        height: 3.5rem;
+        font-size: 1.35rem;
+        border-radius: 8px;
+    }
 }
