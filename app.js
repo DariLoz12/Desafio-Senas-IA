@@ -5,8 +5,10 @@
 class SignGame {
     constructor() {
         this.modelURL = "./model/";
+        this.cloudModelURL = "https://teachablemachine.withgoogle.com/models/gFe3GrbNX/";
         this.model = null;
         this.webcam = null;
+        this.selectedDeviceId = null;
         this.isCameraActive = false;
         this.isLoopRunning = false;
 
@@ -25,11 +27,12 @@ class SignGame {
         this.RANKING_KEY = 'desafio_senas_ranking';
         this.PLAYER_STORAGE_KEY = 'desafio_senas_current_player';
 
-        // Mecánica de Hold (Mantener seña)
-        this.holdingLetter = null;
-        this.holdStartTime = null;
-        this.HOLD_DURATION = 800; // 800ms para confirmación ágil
-        this.CONFIDENCE_THRESHOLD = 0.65; // 65% de certeza mínima
+        // Mecánica de Detección Ágil (Orientada a la letra requerida)
+        this.CONFIDENCE_THRESHOLD = 0.35; // Umbral accesible para la letra requerida
+        this.REQUIRED_CONSECUTIVE_FRAMES = 2; // Solo 2 frames consecutivos (~60-100ms) para confirmación inmediata
+        this.consecutiveCorrectFrames = 0;
+        this.lastAcceptedTime = 0;
+        this.ACTION_COOLDOWN_MS = 450; // Pausa breve entre letras para no saltar letras consecutivas por error
 
         // Audio sintetizado
         this.audioCtx = null;
@@ -127,52 +130,164 @@ class SignGame {
         await this.startModelAndCamera();
     }
 
+    // Cambiar fuente de cámara seleccionada
+    async switchCamera(deviceId) {
+        if (!deviceId) return;
+        this.selectedDeviceId = deviceId;
+        
+        // Detener streams previos
+        if (this.currentStream) {
+            this.currentStream.getTracks().forEach(track => track.stop());
+            this.currentStream = null;
+        }
+        if (this.webcam && this.webcam.webcam && this.webcam.webcam.srcObject) {
+            this.webcam.webcam.srcObject.getTracks().forEach(track => track.stop());
+            this.webcam.webcam.srcObject = null;
+        }
+        this.isLoopRunning = false;
+        await this.startModelAndCamera();
+    }
+
+    // Listar cámaras disponibles (integradas, DroidCam, Iriun, etc.)
+    async populateCameraList() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const select = document.getElementById('camera-select');
+            if (!select || videoDevices.length <= 1) return;
+
+            select.innerHTML = '';
+            videoDevices.forEach((dev, idx) => {
+                const opt = document.createElement('option');
+                opt.value = dev.deviceId;
+                opt.textContent = dev.label || `Cámara ${idx + 1}`;
+                if (this.selectedDeviceId === dev.deviceId) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+            select.classList.remove('hidden');
+        } catch (e) {
+            console.warn("No se pudieron enumerar las cámaras:", e);
+        }
+    }
+
     // Cargar modelo de Teachable Machine y Cámara
     async startModelAndCamera() {
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
         const camLoader = document.getElementById('cam-loader');
 
-        statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
-        statusText.textContent = 'Iniciando cámara...';
+        if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        if (statusText) statusText.textContent = 'Cargando modelo...';
+        if (camLoader) {
+            camLoader.classList.remove('hidden');
+            camLoader.innerHTML = `
+                <div class="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-xs text-slate-600 font-medium">Iniciando cámara e IA...</p>
+            `;
+        }
 
         try {
             // 1. Cargar el modelo
-            this.model = await tmImage.load(this.modelURL + 'model.json', this.modelURL + 'metadata.json');
+            if (!this.model) {
+                try {
+                    this.model = await tmImage.load(this.modelURL + 'model.json', this.modelURL + 'metadata.json');
+                } catch (localLoadErr) {
+                    console.warn("Fallo local, usando cloud:", localLoadErr);
+                    this.model = await tmImage.load(this.cloudModelURL + 'model.json', this.cloudModelURL + 'metadata.json');
+                }
+            }
 
-            // 2. Inicializar webcam
-            statusText.textContent = 'Conectando cámara...';
+            // 2. Inicializar video
+            if (statusText) statusText.textContent = 'Conectando cámara...';
 
-            const flip = true;
-            // Configurar webcam adaptada a móviles (cámara frontal si existe)
-            this.webcam = new tmImage.Webcam(400, 300, flip);
-            await this.webcam.setup({ facingMode: "user" });
-            await this.webcam.play();
+            if (this.currentStream) {
+                this.currentStream.getTracks().forEach(track => track.stop());
+            }
+
+            const videoConstraints = {
+                audio: false,
+                video: this.selectedDeviceId
+                    ? { deviceId: { exact: this.selectedDeviceId } }
+                    : true
+            };
+
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+            } catch (err1) {
+                console.warn("Fallo con restricción exacta, reintentando con ideal:", err1);
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: this.selectedDeviceId ? { deviceId: { ideal: this.selectedDeviceId } } : true
+                });
+            }
+            this.currentStream = stream;
 
             const container = document.getElementById('webcam-view');
             container.innerHTML = '';
-            container.appendChild(this.webcam.canvas);
-            this.webcam.canvas.className = 'w-full h-full object-cover camera-mirror';
+
+            const videoEl = document.createElement('video');
+            videoEl.setAttribute('autoplay', '');
+            videoEl.setAttribute('playsinline', '');
+            videoEl.muted = true;
+            videoEl.srcObject = stream;
+            videoEl.style.width = '100%';
+            videoEl.style.height = '100%';
+            videoEl.style.objectFit = 'cover';
+
+            const offscreenCanvas = document.createElement('canvas');
+            offscreenCanvas.width = 400;
+            offscreenCanvas.height = 300;
+
+            this.webcam = {
+                webcam: videoEl,
+                canvas: offscreenCanvas,
+                update: () => {
+                    if (videoEl.videoWidth > 0) {
+                        const ctx = offscreenCanvas.getContext('2d');
+                        ctx.drawImage(videoEl, 0, 0, 400, 300);
+                    }
+                }
+            };
+
+            container.appendChild(videoEl);
+
+            // Escuchar cuando el video empiece a reproducir frames reales
+            await new Promise((resolve) => {
+                videoEl.onplaying = () => resolve();
+                videoEl.play().catch(resolve);
+                setTimeout(resolve, 1000); // no bloquear si la cámara tarda
+            });
 
             this.isCameraActive = true;
             this.isLoopRunning = true;
             camLoader.classList.add('hidden');
 
-            statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-            statusText.textContent = 'Cámara lista';
+            if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            if (statusText) statusText.textContent = 'Cámara lista';
+
+            // Actualizar selector de cámaras
+            await this.populateCameraList();
 
             window.requestAnimationFrame(() => this.detectLoop());
 
         } catch (err) {
             console.error("Error al iniciar cámara o modelo:", err);
-            statusDot.className = 'w-2 h-2 rounded-full bg-red-500';
-            statusText.textContent = 'Sin acceso a cámara';
+            if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-red-500';
+            if (statusText) statusText.textContent = 'Sin acceso a cámara';
             
+            const errorMsg = (err && (err.message || err.toString())) || 'No se pudo acceder a la cámara';
             camLoader.innerHTML = `
                 <div class="p-4 text-center">
                     <i class="fa-solid fa-video-slash text-slate-400 text-2xl mb-2"></i>
                     <p class="text-xs font-semibold text-slate-700 mb-1">Cámara no disponible</p>
-                    <p class="text-xs text-slate-500">Permite el acceso a la cámara en tu navegador para continuar.</p>
+                    <p class="text-[11px] text-slate-500 mb-3">${errorMsg}</p>
+                    <button type="button" onclick="window.game.startModelAndCamera()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold cursor-pointer">
+                        Reintentar
+                    </button>
                 </div>
             `;
         }
@@ -181,30 +296,49 @@ class SignGame {
     // Bucle continuo de predicción
     async detectLoop() {
         if (!this.isLoopRunning) return;
-        this.webcam.update();
+        
+        // Actualizar canvas interno para la IA
+        if (this.webcam) {
+            this.webcam.update();
+        }
 
-        if (this.model) {
+        if (this.model && this.webcam && this.webcam.canvas) {
             const predictions = await this.model.predict(this.webcam.canvas);
-            predictions.sort((a, b) => b.probability - a.probability);
+            
+            // 1. Letra con mayor probabilidad global (para mostrar en el visor en vivo)
+            let topLetter = '-';
+            let topProb = 0;
+            for (let i = 0; i < predictions.length; i++) {
+                if (predictions[i].probability > topProb) {
+                    topProb = predictions[i].probability;
+                    topLetter = predictions[i].className.toUpperCase();
+                }
+            }
 
-            const top = predictions[0];
-            const letter = top.className.toUpperCase();
-            const prob = top.probability;
+            // 2. Probabilidad específica de la letra que se necesita responder
+            const targetLetter = this.getTargetLetter();
+            let targetProb = 0;
+            if (targetLetter) {
+                const targetPred = predictions.find(p => p.className.toUpperCase() === targetLetter);
+                if (targetPred) {
+                    targetProb = targetPred.probability;
+                }
+            }
 
-            this.updateLiveCard(letter, prob);
-            this.processDetection(letter, prob);
+            this.updateLiveCard(topLetter, topProb, targetLetter, targetProb);
+            this.processDetection(topLetter, topProb, targetLetter, targetProb);
         }
 
         window.requestAnimationFrame(() => this.detectLoop());
     }
 
     // Actualiza el indicador visual de detección
-    updateLiveCard(letter, prob) {
+    updateLiveCard(letter, prob, targetLetter, targetProb) {
         const liveLetter = document.getElementById('live-letter');
         const liveConf = document.getElementById('live-conf');
         const liveBar = document.getElementById('live-conf-bar');
 
-        if (prob >= 0.4) {
+        if (prob >= 0.3) {
             liveLetter.textContent = letter;
             liveConf.textContent = `${Math.round(prob * 100)}%`;
             if (liveBar) liveBar.style.width = `${Math.round(prob * 100)}%`;
@@ -215,35 +349,36 @@ class SignGame {
         }
     }
 
-    // Procesar la letra detectada con la mecánica de Hold
-    processDetection(letter, prob) {
-        if (this.wordCompleted) {
+    // Procesar la detección: ágil, enfocado en la letra requerida y sin espera tediosa
+    processDetection(topLetter, topProb, targetLetter, targetProb) {
+        if (this.wordCompleted || !targetLetter) {
             this.resetHold();
             return;
         }
 
-        const targetLetter = this.getTargetLetter();
+        const now = performance.now();
+        if (now - this.lastAcceptedTime < this.ACTION_COOLDOWN_MS) {
+            this.resetHold();
+            return;
+        }
 
-        // ¿La letra coincide y supera el umbral de certeza?
-        if (prob >= this.CONFIDENCE_THRESHOLD && letter === targetLetter) {
-            const now = performance.now();
+        // Se considera correcta si:
+        // A) La letra requerida supera el umbral objetivo (ej. 35%), o
+        // B) Es la predicción número 1 y coincide con la letra requerida
+        const isTargetMatched = (targetProb >= this.CONFIDENCE_THRESHOLD) || (topLetter === targetLetter && topProb >= 0.30);
+
+        if (isTargetMatched) {
+            this.consecutiveCorrectFrames++;
+
             const overlay = document.getElementById('hold-overlay');
             const pBar = document.getElementById('hold-bar');
+            if (overlay) overlay.classList.remove('hidden');
+            if (pBar) pBar.style.width = '100%';
 
-            if (this.holdingLetter !== letter) {
-                this.holdingLetter = letter;
-                this.holdStartTime = now;
-                if (overlay) overlay.classList.remove('hidden');
-                return;
-            }
-
-            const elapsed = now - this.holdStartTime;
-            const pct = Math.min(100, (elapsed / this.HOLD_DURATION) * 100);
-            if (pBar) pBar.style.width = `${pct}%`;
-
-            if (elapsed >= this.HOLD_DURATION) {
+            if (this.consecutiveCorrectFrames >= this.REQUIRED_CONSECUTIVE_FRAMES) {
+                this.lastAcceptedTime = now;
                 this.resetHold();
-                this.registerCorrectLetter(letter);
+                this.registerCorrectLetter(targetLetter);
             }
         } else {
             this.resetHold();
@@ -251,8 +386,7 @@ class SignGame {
     }
 
     resetHold() {
-        this.holdingLetter = null;
-        this.holdStartTime = null;
+        this.consecutiveCorrectFrames = 0;
         const overlay = document.getElementById('hold-overlay');
         const pBar = document.getElementById('hold-bar');
         if (overlay) overlay.classList.add('hidden');
@@ -713,6 +847,7 @@ class SignGame {
 
 // Instanciar al cargar la página
 const game = new SignGame();
+window.game = game;
 window.addEventListener('DOMContentLoaded', () => {
     game.init();
 });
